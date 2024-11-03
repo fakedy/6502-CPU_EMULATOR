@@ -40,12 +40,12 @@ struct CPU {
 	MEM* mem;
 
 	// Registers
-	Byte A; // Accumulator
-	Byte X; // Index
-	Byte Y; // Index
+	Byte A = 0x0; // Accumulator
+	Byte X = 0x0; // Index
+	Byte Y = 0x0; // Index
 
-	Word Pc; // Program counter
-	Byte Sp; // stack pointer
+	Word Pc = 0x0; // Program counter
+	Byte Sp = 0x0; // stack pointer
 
 	bool halted = false;
 	int cyclesRemaining;
@@ -57,6 +57,8 @@ struct CPU {
 	Byte lowByte = 0;
 	Byte HighByte = 0;
 	Word effectiveAdress = 0;
+	Byte offset = 0x0;
+	Byte oldPc = 0x0;
 	enum State {FETCH, EXECUTE};
 	State state = FETCH;
 
@@ -116,7 +118,7 @@ struct CPU {
 			}
 			prevOpCode = opCode;
 			// for debugging
-			if (loops > 5) {
+			if (loops > 200) {
 				opCode = 0x00; // break instruction
 			}
 			cyclesRemaining = getInstructionCycles(opCode);
@@ -212,6 +214,8 @@ struct CPU {
 		INS_ADC_IMMEDIATE = 0x69,
 		// AND
 		INS_AND_IMMEDIATE = 0x29,
+		// BNE
+		INS_BNE_RELATIVE = 0xD0,
 		// BRK
 		INS_BRK_IMPLIED = 0x00,
 		// CLD
@@ -230,6 +234,8 @@ struct CPU {
 		INS_LDX_IMMEDIATE = 0xA2,
 		// LDY
 		INS_LDY_IMMEDIATE = 0xA0,
+		// NOP
+		INS_NOP_IMPLIED = 0xEA,
 		// STA
 		INS_STA_ABSOLUTE = 0x8D,
 		// TXS
@@ -241,6 +247,8 @@ struct CPU {
 		case INS_ADC_IMMEDIATE:
 			return 2;
 		case INS_AND_IMMEDIATE:
+			return 2;
+		case INS_BNE_RELATIVE:
 			return 2;
 		case INS_BRK_IMPLIED:
 			return 7;
@@ -259,6 +267,8 @@ struct CPU {
 		case INS_LDX_IMMEDIATE:
 			return 2;
 		case INS_LDY_IMMEDIATE:
+			return 2;
+		case INS_NOP_IMPLIED:
 			return 2;
 		case INS_STA_ABSOLUTE:
 			return 4;
@@ -309,6 +319,32 @@ struct CPU {
 					break;
 
 				}
+				break;
+			}
+			// BNE
+			case INS_BNE_RELATIVE: {
+				switch (currentCycle) {
+				case 1:
+					offset = MR(Pc);
+					Pc++;
+					break;
+				case 2:
+					if (status.Z == 0) {
+						oldPc = Pc;
+						Pc = Pc + offset;
+						cyclesRemaining++;
+					}
+					break;
+				case 3:
+					if ((oldPc & 0xFF00) != (Pc & 0xFF00)) { // check if we cross a page boundary by isolating the high bytes and comparing
+						cyclesRemaining++;
+					}
+					break;
+				case 4:
+					break;
+
+				}
+
 				break;
 			}
 			// BRK
@@ -464,6 +500,16 @@ struct CPU {
 					Y = operand;
 					setZero(Y);
 					setNegative(Y);
+					break;
+				}
+				break;
+			}
+			// NOP
+			case INS_NOP_IMPLIED: {
+				switch (currentCycle) {
+				case 1:
+					break;
+				case 2:
 					break;
 				}
 				break;

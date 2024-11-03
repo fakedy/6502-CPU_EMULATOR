@@ -581,7 +581,7 @@ int main() {
 
 
 	Word loadAddress = 0x0000;
-	const char* file = "6502_functional_test.bin";
+	const char* file = "ROMS/6502_functional_test.bin";
 
 	std::ifstream rom(file, std::ios::binary);
 	if (rom.is_open()) {

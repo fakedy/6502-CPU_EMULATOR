@@ -57,7 +57,7 @@ struct CPU {
 	Byte lowByte = 0;
 	Byte HighByte = 0;
 	Word effectiveAdress = 0;
-	Byte offset = 0x0;
+	int8_t offset = 0x0;
 	Byte oldPc = 0x0;
 	enum State {FETCH, EXECUTE};
 	State state = FETCH;
@@ -111,14 +111,14 @@ struct CPU {
 		switch (state) {
 		case FETCH:
 			opCode = MR(Pc);
-
+			std::cout << "\033[33m" << "Pc: " << std::hex << Pc + 0x0 << std::endl;
 			// for debugging
 			if (prevOpCode == opCode) {
 				loops++;
 			}
 			prevOpCode = opCode;
 			// for debugging
-			if (loops > 200) {
+			if (loops > 300) {
 				opCode = 0x00; // break instruction
 			}
 			cyclesRemaining = getInstructionCycles(opCode);
@@ -214,6 +214,8 @@ struct CPU {
 		INS_ADC_IMMEDIATE = 0x69,
 		// AND
 		INS_AND_IMMEDIATE = 0x29,
+		// BEQ
+		INS_BEQ_RELATIVE = 0xF0,
 		// BNE
 		INS_BNE_RELATIVE = 0xD0,
 		// BRK
@@ -247,6 +249,8 @@ struct CPU {
 		case INS_ADC_IMMEDIATE:
 			return 2;
 		case INS_AND_IMMEDIATE:
+			return 2;
+		case INS_BEQ_RELATIVE:
 			return 2;
 		case INS_BNE_RELATIVE:
 			return 2;
@@ -321,6 +325,32 @@ struct CPU {
 				}
 				break;
 			}
+			// BEQ
+			case INS_BEQ_RELATIVE: {
+				switch (currentCycle) {
+				case 1:
+					offset = MR(Pc);
+					Pc++;
+					break;
+				case 2:
+					if (status.Z == 1) {
+						oldPc = Pc;
+						Pc = Pc + offset;
+						cyclesRemaining++;
+					}
+					break;
+				case 3:
+					if ((oldPc & 0xFF00) != (Pc & 0xFF00)) { // check if we cross a page boundary by isolating the high bytes and comparing
+						cyclesRemaining++;
+					}
+					break;
+				case 4:
+					break;
+
+				}
+
+				break;
+			}
 			// BNE
 			case INS_BNE_RELATIVE: {
 				switch (currentCycle) {
@@ -330,13 +360,13 @@ struct CPU {
 					break;
 				case 2:
 					if (status.Z == 0) {
-						oldPc = Pc;
-						Pc = Pc + offset;
-						cyclesRemaining++;
+						oldPc = Pc; 
+						Pc = Pc + offset; 
+						cyclesRemaining++; 
 					}
-					break;
+					break; 
 				case 3:
-					if ((oldPc & 0xFF00) != (Pc & 0xFF00)) { // check if we cross a page boundary by isolating the high bytes and comparing
+					if ((oldPc & 0xFF00) != (Pc & 0xFF00)) { 
 						cyclesRemaining++;
 					}
 					break;
@@ -671,7 +701,9 @@ int main() {
 	std::cout << "--------------------------------------------" << std::endl;
 	*/
 	while (true) {
+		//std::cout << "\033[33m" << "Pc: " << std::hex << cpu.Pc + 0x0 << std::endl;
 		cpu.tick();
+		//log.printX();
 		if (cpu.status.B == 1) {
 			break;
 		}

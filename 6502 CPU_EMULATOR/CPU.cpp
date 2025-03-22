@@ -111,7 +111,7 @@ struct CPU {
 		switch (state) {
 		case FETCH:
 			opCode = MR(Pc);
-			std::cout << "\033[33m" << "Pc: " << std::hex << Pc + 0x0 << std::endl;
+			//std::cout << "\033[33m" << "Pc: " << std::hex << Pc + 0x0 << std::endl;
 			// for debugging
 			if (prevOpCode == opCode) {
 				loops++;
@@ -120,10 +120,11 @@ struct CPU {
 			// for debugging
 			if (loops > 300) {
 				opCode = 0x00; // break instruction
+				std::cout << "\033[31m" << "Stuck in loop. Something wrong with instructions.\n";
 			}
 			cyclesRemaining = getInstructionCycles(opCode);
 			if (cyclesRemaining != 0) {
-				std::cout << "\033[32m0x" << std::hex << opCode + 0x0 << " IMPLEMENTED" << std::endl;
+				//std::cout << "\033[32m0x" << std::hex << opCode + 0x0 << " IMPLEMENTED" << std::endl;
 			}
 			else {
 				std::cout << "\033[31m0x" << std::hex << opCode + 0x0 << " NOT IMPLEMENTED" << std::endl;
@@ -163,7 +164,7 @@ struct CPU {
 
 
 
-	void setCarry(int result) {
+	void setCarry(int result) { // TODO i think this is just wrong :)
 
 		if (0b10000000 & result) { // C flag
 			status.C = 1;
@@ -206,9 +207,11 @@ struct CPU {
 
 	}
 	
+	// Check if bit 7 of argument is set
 	void setNegative(int result) {
 		status.N = (result & 0x80) ? 1 : 0;
-	}
+	} 
+
 	static constexpr Byte
 		// ADC
 		INS_ADC_IMMEDIATE = 0x69,
@@ -241,7 +244,14 @@ struct CPU {
 		// STA
 		INS_STA_ABSOLUTE = 0x8D,
 		// TXS
-		INS_TXS_IMPLIED = 0x9A;
+		INS_TXS_IMPLIED = 0x9A,
+		// LDA
+		INS_LDA_ABSOLUTE = 0xAD,
+		// CMP
+		INS_CMP_IMMEDIATE = 0xC9,
+		// TYA
+		INS_TYA_IMPLIED = 0x98;
+		
 
 
 	int getInstructionCycles(Byte opcode) {
@@ -277,6 +287,12 @@ struct CPU {
 		case INS_STA_ABSOLUTE:
 			return 4;
 		case INS_TXS_IMPLIED:
+			return 2;
+		case INS_LDA_ABSOLUTE:
+			return 4;
+		case INS_CMP_IMMEDIATE:
+			return 2;
+		case INS_TYA_IMPLIED:
 			return 2;
 		default:
 			return 0; // Unknown opcode
@@ -575,6 +591,59 @@ struct CPU {
 				}
 				break;
 			}
+			// LDA
+			case INS_LDA_ABSOLUTE: {
+				switch (currentCycle) {
+				case 1:
+					lowByte = MR(Pc);
+					Pc++;
+					break;
+				case 2:
+					HighByte = MR(Pc);
+					Pc++;
+					break;
+				case 3:
+					calcEffectiveAdress();
+					break;
+				case 4:
+					A = MR(effectiveAdress);
+					setZero(A);
+					setNegative(A); // TODO make sure this is actually correct
+					break;
+				}
+				break;
+			}
+			// CMP
+			case INS_CMP_IMMEDIATE: {
+				switch (currentCycle) {
+				case 1:
+					operand = MR(Pc);
+					Pc++;
+					break;
+				case 2:
+
+					uint8_t result = A - operand;
+					status.C = (A >= result) ? 1 : 0;
+					status.Z = (result == 0) ? 1 : 0;
+					setNegative(result);
+					break;
+				}
+				break;
+			}
+			// CMP
+			case INS_TYA_IMPLIED: {
+				switch (currentCycle) {
+				case 1:
+					break;
+				case 2:
+					A = Y;
+					setNegative(A);
+					status.Z = (A == 0) ? 1 : 0;
+					break;
+				}
+				break;
+			}
+
 
 
 
@@ -715,6 +784,6 @@ int main() {
 	log.printY();
 	log.printMem(0x0200);
 	*/
-	while (true);
+	while (true); // keeping the program from closing
 }
 
